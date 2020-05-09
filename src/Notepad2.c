@@ -103,7 +103,6 @@ static WCHAR tchLastSaveCopyDir[MAX_PATH] = L"";
 WCHAR	tchOpenWithDir[MAX_PATH];
 WCHAR	tchFavoritesDir[MAX_PATH];
 static WCHAR tchDefaultDir[MAX_PATH];
-static WCHAR tchDefaultExtension[64];
 static WCHAR tchToolbarButtons[MAX_TOOLBAR_BUTTON_CONFIG_BUFFER_SIZE];
 static LPWSTR tchToolbarBitmap = NULL;
 static LPWSTR tchToolbarBitmapHot = NULL;
@@ -315,9 +314,7 @@ struct CachedStatusItem {
 	LPCWSTR pszOvrMode;
 	WCHAR tchZoom[8];
 
-#if NP2_ENABLE_LOCALIZE_LEXER_NAME
 	WCHAR tchLexerName[MAX_EDITLEXER_NAME_SIZE];
-#endif
 	WCHAR tchDocPosFmt[96];
 } cachedStatusItem;
 
@@ -2106,11 +2103,7 @@ void MsgSize(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 void UpdateStatusBarCache(int item) {
 	switch (item) {
 	case STATUS_LEXER:
-#if NP2_ENABLE_LOCALIZE_LEXER_NAME
-		cachedStatusItem.pszLexerName = Style_GetCurrentLexerDisplayName(cachedStatusItem.tchLexerName, MAX_EDITLEXER_NAME_SIZE);
-#else
-		cachedStatusItem.pszLexerName = Style_GetCurrentLexerName();
-#endif
+		cachedStatusItem.pszLexerName = Style_GetCurrentLexerName(cachedStatusItem.tchLexerName, MAX_EDITLEXER_NAME_SIZE);
 		cachedStatusItem.updateMask |= STATUS_BAR_UPDATE_MASK_LEXER;
 		UpdateStatusBarWidth();
 		break;
@@ -6479,9 +6472,6 @@ void LoadFlags(void) {
 	flagRelativeFileMRU = IniSectionGetBool(pIniSection, L"RelativeFileMRU", 1);
 	flagPortableMyDocs = IniSectionGetBool(pIniSection, L"PortableMyDocs", flagRelativeFileMRU);
 
-	IniSectionGetString(pIniSection, L"DefaultExtension", L"txt", tchDefaultExtension, COUNTOF(tchDefaultExtension));
-	StrTrim(tchDefaultExtension, L" \t.\"");
-
 	IniSectionGetString(pIniSection, L"DefaultDirectory", L"", tchDefaultDir, COUNTOF(tchDefaultDir));
 
 	dwFileCheckInterval = IniSectionGetInt(pIniSection, L"FileCheckInterval", 1000);
@@ -7389,7 +7379,6 @@ BOOL OpenFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | /* OFN_NOCHANGEDIR |*/
 				OFN_DONTADDTORECENT | OFN_PATHMUSTEXIST |
 				OFN_SHAREAWARE /*| OFN_NODEREFERENCELINKS*/ | OFN_NOVALIDATE;
-	ofn.lpstrDefExt = StrNotEmpty(tchDefaultExtension) ? tchDefaultExtension : NULL;
 
 	const BOOL success = GetOpenFileName(&ofn);
 	if (success) {
@@ -7439,7 +7428,6 @@ BOOL SaveFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	ofn.Flags = OFN_HIDEREADONLY /*| OFN_NOCHANGEDIR*/ |
 				/*OFN_NODEREFERENCELINKS |*/ OFN_OVERWRITEPROMPT |
 				OFN_DONTADDTORECENT | OFN_PATHMUSTEXIST;
-	ofn.lpstrDefExt = StrNotEmpty(tchDefaultExtension) ? tchDefaultExtension : NULL;
 
 	const BOOL success = GetSaveFileName(&ofn);
 	if (success) {
