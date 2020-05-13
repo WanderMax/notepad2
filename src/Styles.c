@@ -135,7 +135,6 @@ extern EDITLEXER lexYAML;
 // 3. other lexers, grouped by first letter, sorted alphabetical (case insensitive).
 #define LEXER_INDEX_GENERAL		(LEXER_INDEX_MATCH + 2)	// global styles and lexers for text file
 #define GENERAL_LEXER_COUNT		(ALL_LEXER_COUNT - LEXER_INDEX_GENERAL)
-#define MAX_FAVORITE_SCHEMES_COUNT			31
 #define MAX_FAVORITE_SCHEMES_CONFIG_SIZE	128	// 1 + MAX_FAVORITE_SCHEMES_COUNT*(3 + 1)
 #define MAX_FAVORITE_SCHEMES_SAFE_SIZE		(MAX_FAVORITE_SCHEMES_CONFIG_SIZE - 5) // three digits, one space and NULL
 // This array holds all the lexers...
@@ -3077,7 +3076,7 @@ void Style_SetBookmark(void) {
 //
 // Style_GetOpenDlgFilterStr()
 //
-static int AddLexFilterStr(LPWSTR szFilter, LPCEDITLEXER pLex, int length) {
+static void AddLexFilterStr(LPWSTR szFilter, LPCEDITLEXER pLex, LPCWSTR lpszExt, int *length, int lexers[], int *index) {
 	LPCWSTR p = pLex->szExtensions;
 	if (StrIsEmpty(p)) {
 		p = pLex->pszDefExt;
@@ -3108,8 +3107,25 @@ static int AddLexFilterStr(LPWSTR szFilter, LPCEDITLEXER pLex, int length) {
 		}
 	}
 
+	// add file extension for current file to current scheme
+	if (StrNotEmpty(lpszExt)) {
+		if (state == 0) {
+			state = 1;
+			*ptr++ = L';';
+		}
+		*ptr = L'\0';
+
+		WCHAR wch[MAX_PATH];
+		wsprintf(wch, L"*%s;", lpszExt);
+		if (StrStrI(extensions, wch) == NULL) {
+			++count;
+			lstrcpy(ptr, wch);
+			ptr += lstrlen(wch);
+		}
+	}
+
 	if (count == 0) {
-		return length;
+		return;
 	}
 	if (state == 1) {
 		--ptr; // trailing semicolon
@@ -3128,32 +3144,36 @@ static int AddLexFilterStr(LPWSTR szFilter, LPCEDITLEXER pLex, int length) {
 	LPCWSTR pszName = pLex->pszName;
 #endif
 
-	length += wsprintf(szFilter + length, L"%s (%s)|%s|", pszName, extensions, extensions);
-	return length;
+	*length += wsprintf(szFilter + *length, L"%s (%s)|%s|", pszName, extensions, extensions);
+	lexers[*index] = pLex->rid;
+	*index += 1;
 }
 
-LPWSTR Style_GetOpenDlgFilterStr(BOOL open) {
-	int length = (MAX_FAVORITE_SCHEMES_COUNT + 1 + LEXER_INDEX_GENERAL - LEXER_INDEX_MATCH)
+LPWSTR Style_GetOpenDlgFilterStr(BOOL open, LPCWSTR lpszFile, int lexers[]) {
+	int length = (MAX_FAVORITE_SCHEMES_COUNT + 2 + LEXER_INDEX_GENERAL - LEXER_INDEX_MATCH)
 				*(MAX_EDITLEXER_NAME_SIZE + MAX_EDITLEXER_EXT_SIZE*3*2);
 	LPWSTR szFilter = (LPWSTR)NP2HeapAlloc(length * sizeof(WCHAR));
 
 	length = 0;
+	int index = 1; // 1-based filter index
 	if (open) {
 		// All Files comes first for open file dialog.
 		GetString(IDS_FILTER_ALL, szFilter, MAX_EDITLEXER_EXT_SIZE);
 		length = lstrlen(szFilter);
+		++index;
 	}
 
 	// current scheme
-	length = AddLexFilterStr(szFilter, pLexCurrent, length);
+	LPCWSTR lpszExt = PathFindExtension(lpszFile);
+	AddLexFilterStr(szFilter, pLexCurrent, lpszExt, &length, lexers, &index);
 	// text file and favorite schemes
-	for (UINT index = LEXER_INDEX_MATCH; index < ALL_LEXER_COUNT; index++) {
-		LPCEDITLEXER pLex = pLexArray[index];
-		if (index >= LEXER_INDEX_GENERAL && pLex->iFavoriteOrder == 0) {
+	for (UINT iLexer = LEXER_INDEX_MATCH; iLexer < ALL_LEXER_COUNT; iLexer++) {
+		LPCEDITLEXER pLex = pLexArray[iLexer];
+		if (iLexer >= LEXER_INDEX_GENERAL && pLex->iFavoriteOrder == 0) {
 			break;
 		}
 		if (pLex != pLexCurrent) {
-			length = AddLexFilterStr(szFilter, pLex, length);
+			AddLexFilterStr(szFilter, pLex, NULL, &length, lexers, &index);
 		}
 	}
 

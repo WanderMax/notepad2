@@ -296,7 +296,7 @@ extern int iOvrCaretStyle;
 extern BOOL bBlockCaretOutSelection;
 extern int iCaretBlinkPeriod;
 
-static BOOL fIsElevated = FALSE;
+BOOL fIsElevated = FALSE;
 static WCHAR wchWndClass[16] = WC_NOTEPAD2;
 
 #define STATUS_BAR_UPDATE_MASK_LEXER	1
@@ -329,7 +329,7 @@ DWORD		kSystemLibraryLoadFlags = 0;
 #endif
 UINT		g_uCurrentDPI = USER_DEFAULT_SCREEN_DPI;
 UINT		g_uDefaultDPI = USER_DEFAULT_SCREEN_DPI;
-static WCHAR g_wchAppUserModelID[64] = L"";
+WCHAR 		g_wchAppUserModelID[64] = L"";
 static WCHAR g_wchWorkingDirectory[MAX_PATH] = L"";
 #if NP2_ENABLE_APP_LOCALIZATION_DLL
 static HMODULE hResDLL;
@@ -371,7 +371,7 @@ static int	flagMatchText			= 0;
 static int	flagChangeNotify		= 0;
 static int	flagLexerSpecified		= 0;
 static int	flagQuietCreate			= 0;
-static int	flagUseSystemMRU		= 0;
+int			flagUseSystemMRU		= 0;
 static int	flagRelaunchElevated	= 0;
 static int	flagDisplayHelp			= 0;
 
@@ -1606,7 +1606,7 @@ HWND EditCreate(HWND hwndParent) {
 	SciCall_SetMultipleSelection(TRUE);
 	SciCall_SetAdditionalSelectionTyping(TRUE);
 	SciCall_SetMultiPaste(SC_MULTIPASTE_EACH);
-	SciCall_SetVirtualSpaceOptions(SCVS_RECTANGULARSELECTION | SCVS_NOWRAPLINESTART);
+	SciCall_SetVirtualSpaceOptions(SCVS_RECTANGULARSELECTION);
 	SciCall_SetAdditionalCaretsBlink(TRUE);
 	SciCall_SetAdditionalCaretsVisible(TRUE);
 	// style both before and after the visible text in the background
@@ -2177,7 +2177,6 @@ void ValidateUILangauge(void) {
 }
 
 void SetUILanguage(UINT menu) {
-	languageMenu = menu;
 	LANGID lang = uiLanguage;
 	switch (menu) {
 	case IDM_LANG_USER_DEFAULT:
@@ -2197,9 +2196,19 @@ void SetUILanguage(UINT menu) {
 		break;
 	}
 
-	// TODO: change UI language without restart or alert restart is required.
-	uiLanguage = lang;
-	IniSetInt(INI_SECTION_NAME_FLAGS, L"UILanguage", lang);
+	if (uiLanguage == lang) {
+		return;
+	}
+
+	const int result = MsgBox(MBYESNOCANCEL, IDS_CHANGE_LANG_RESTART);
+	if (result != IDCANCEL) {
+		languageMenu = menu;
+		uiLanguage = lang;
+		IniSetInt(INI_SECTION_NAME_FLAGS, L"UILanguage", lang);
+		if (result == IDYES) {
+			PostWMCommand(hwndMain, IDM_FILE_RESTART);
+		}
+	}
 }
 #endif
 
@@ -2373,6 +2382,17 @@ void MsgInitMenu(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 	EnableCmd(hmenu, IDM_EDIT_INVERTCASE, i /*&& !bReadOnly*/ /*&& IsWindowsNT()*/);
 	EnableCmd(hmenu, IDM_EDIT_TITLECASE, i /*&& !bReadOnly*/ /*&& IsWindowsNT()*/);
 	EnableCmd(hmenu, IDM_EDIT_SENTENCECASE, i /*&& !bReadOnly*/ /*&& IsWindowsNT()*/);
+	EnableCmd(hmenu, IDM_EDIT_MAP_FULLWIDTH, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_HALFWIDTH, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_SIMPLIFIED_CHINESE, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_TRADITIONAL_CHINESE, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_HIRAGANA, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_KATAKANA, i);
+	EnableCmd(hmenu, IDM_EDIT_MAP_MALAYALAM_LATIN, i && IsWin7AndAbove());
+	EnableCmd(hmenu, IDM_EDIT_MAP_DEVANAGARI_LATIN, i && IsWin7AndAbove());
+	EnableCmd(hmenu, IDM_EDIT_MAP_CYRILLIC_LATIN, i && IsWin7AndAbove());
+	EnableCmd(hmenu, IDM_EDIT_MAP_BENGALI_LATIN, i && IsWin7AndAbove());
+	EnableCmd(hmenu, IDM_EDIT_MAP_HANGUL_DECOMPOSITION, i && IsWin7AndAbove());
 
 	EnableCmd(hmenu, IDM_EDIT_CONVERTTABS, i /*&& !bReadOnly*/);
 	EnableCmd(hmenu, IDM_EDIT_CONVERTSPACES, i /*&& !bReadOnly*/);
@@ -2419,8 +2439,8 @@ void MsgInitMenu(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 	EnableCmd(hmenu, IDM_EDIT_FINDPREV, i && StrNotEmptyA(efrData.szFind));
 	EnableCmd(hmenu, IDM_EDIT_REPLACE, i /*&& !bReadOnly*/);
 	EnableCmd(hmenu, IDM_EDIT_REPLACENEXT, i);
-	//EnableCmd(hmenu, IDM_EDIT_SELECTWORD, i);
-	//EnableCmd(hmenu, IDM_EDIT_SELECTLINE, i);
+	EnableCmd(hmenu, IDM_EDIT_SELECTWORD, i);
+	EnableCmd(hmenu, IDM_EDIT_SELECTLINE, i);
 	EnableCmd(hmenu, IDM_EDIT_SELTODOCEND, i);
 	EnableCmd(hmenu, IDM_EDIT_SELTODOCSTART, i);
 	EnableCmd(hmenu, IDM_EDIT_SELTONEXT, i && StrNotEmptyA(efrData.szFind));
@@ -2691,7 +2711,8 @@ LRESULT MsgCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 		break;
 
 	case IDM_FILE_NEWWINDOW:
-	case IDM_FILE_NEWWINDOW2: {
+	case IDM_FILE_NEWWINDOW2:
+	case IDM_FILE_RESTART: {
 		const BOOL emptyWind = LOWORD(wParam) == IDM_FILE_NEWWINDOW2;
 		if (!emptyWind && bSaveBeforeRunningTools && !FileSave(FALSE, TRUE, FALSE, FALSE)) {
 			break;
@@ -2713,8 +2734,11 @@ LRESULT MsgCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 		sei.lpDirectory = g_wchWorkingDirectory;
 		sei.nShow = SW_SHOWNORMAL;
 
-		ShellExecuteEx(&sei);
+		const BOOL result = ShellExecuteEx(&sei);
 		NP2HeapFree(szParameters);
+		if (result && LOWORD(wParam) == IDM_FILE_RESTART) {
+			DestroyWindow(hwnd);
+		}
 	}
 	break;
 
@@ -3005,7 +3029,12 @@ LRESULT MsgCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 			bLastCopyFromMe = TRUE;
 		}
 		if (SciCall_IsSelectionEmpty()) {
+			Sci_Position iCurrentPos = SciCall_GetCurrentPos();
+			const Sci_Position iCol = SciCall_GetColumn(iCurrentPos) + 1;
 			SciCall_LineCut(bEnableLineSelectionMode);
+			iCurrentPos = SciCall_GetCurrentPos();
+			const Sci_Line iCurLine = SciCall_LineFromPosition(iCurrentPos);
+			EditJumpTo(iCurLine, iCol);
 		} else {
 			SciCall_Cut(FALSE);
 		}
@@ -3330,8 +3359,19 @@ LRESULT MsgCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 		break;
 
 	case IDM_EDIT_TITLECASE:
+	case IDM_EDIT_MAP_FULLWIDTH:
+	case IDM_EDIT_MAP_HALFWIDTH:
+	case IDM_EDIT_MAP_SIMPLIFIED_CHINESE:
+	case IDM_EDIT_MAP_TRADITIONAL_CHINESE:
+	case IDM_EDIT_MAP_HIRAGANA:
+	case IDM_EDIT_MAP_KATAKANA:
+	case IDM_EDIT_MAP_MALAYALAM_LATIN:
+	case IDM_EDIT_MAP_DEVANAGARI_LATIN:
+	case IDM_EDIT_MAP_CYRILLIC_LATIN:
+	case IDM_EDIT_MAP_BENGALI_LATIN:
+	case IDM_EDIT_MAP_HANGUL_DECOMPOSITION:
 		BeginWaitCursor();
-		EditTitleCase();
+		EditMapTextCase(LOWORD(wParam));
 		EndWaitCursor();
 		break;
 
@@ -4708,6 +4748,10 @@ LRESULT MsgCommand(HWND hwnd, WPARAM wParam, LPARAM lParam) {
 			CreateIniFile();
 			FileLoad(FALSE, FALSE, FALSE, FALSE, szIniFile);
 		}
+		break;
+
+	case IDM_SET_SYSTEM_INTEGRATION:
+		SystemIntegrationDlg(hwnd);
 		break;
 
 	case IDT_FILE_NEW:
@@ -7071,7 +7115,7 @@ BOOL FileLoad(BOOL bDontSave, BOOL bNew, BOOL bReload, BOOL bNoEncDetect, LPCWST
 
 	// Ask to create a new file...
 	if (!bReload && !PathFileExists(szFileName)) {
-		UINT result = IDCANCEL;
+		int result = IDCANCEL;
 		if (flagQuietCreate || (result = MsgBox(MBYESNOCANCEL, IDS_ASK_CREATE, szFileName)) == IDYES) {
 			HANDLE hFile = CreateFile(szFileName,
 									  GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -7121,13 +7165,24 @@ BOOL FileLoad(BOOL bDontSave, BOOL bNew, BOOL bReload, BOOL bNoEncDetect, LPCWST
 		SciCall_SetEOLMode(iEOLMode);
 		UpdateStatusBarCache(STATUS_CODEPAGE);
 		UpdateStatusBarCache(STATUS_EOLMODE);
+
 		BOOL bUnknownFile = FALSE;
-		if (!lexerSpecified) { // flagLexerSpecified will be cleared
-			np2LexLangIndex = 0;
-			bUnknownFile = !Style_SetLexerFromFile(szCurFile);
+		if (!lexerSpecified) {
+			if (flagLexerSpecified) {
+				if (pLexCurrent->rid == iInitialLexer) {
+					UpdateLineNumberWidth();
+				} else {
+					Style_SetLexerFromID(iInitialLexer);
+				}
+				flagLexerSpecified = 0;
+			} else {
+				np2LexLangIndex = 0;
+				bUnknownFile = !Style_SetLexerFromFile(szCurFile);
+			}
 		} else {
 			UpdateLineNumberWidth();
 		}
+
 		MRU_AddFile(pFileMRU, szFileName, flagRelativeFileMRU, flagPortableMyDocs);
 		if (flagUseSystemMRU == 2) {
 			SHAddToRecentDocs(SHARD_PATHW, szFileName);
@@ -7295,7 +7350,16 @@ BOOL FileSave(BOOL bSaveAlways, BOOL bAsk, BOOL bSaveAs, BOOL bSaveCopy) {
 					if (!fKeepTitleExcerpt) {
 						lstrcpy(szTitleExcerpt, L"");
 					}
-					Style_SetLexerFromFile(szCurFile);
+					if (flagLexerSpecified) {
+						if (pLexCurrent->rid == iInitialLexer) {
+							UpdateLineNumberWidth();
+						} else {
+							Style_SetLexerFromID(iInitialLexer);
+						}
+						flagLexerSpecified = 0;
+					} else {
+						Style_SetLexerFromFile(szCurFile);
+					}
 				} else {
 					lstrcpy(tchLastSaveCopyDir, tchFile);
 					PathRemoveFileSpec(tchLastSaveCopyDir);
@@ -7366,7 +7430,8 @@ BOOL OpenFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 
 	WCHAR szFile[MAX_PATH];
 	lstrcpy(szFile, L"");
-	LPWSTR szFilter = Style_GetOpenDlgFilterStr(TRUE);
+	int lexers[1 + OPENDLG_MAX_LEXER_COUNT] = {0}; // 1-based filter index
+	LPWSTR szFilter = Style_GetOpenDlgFilterStr(TRUE, szCurFile, lexers);
 
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(OPENFILENAME));
@@ -7375,6 +7440,7 @@ BOOL OpenFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	ofn.lpstrFilter = szFilter;
 	ofn.lpstrFile = szFile;
 	ofn.lpstrInitialDir = (lpstrInitialDir) ? lpstrInitialDir : tchInitialDir;
+	ofn.lpstrDefExt = L""; // auto add first extension from current filter
 	ofn.nMaxFile = COUNTOF(szFile);
 	ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | /* OFN_NOCHANGEDIR |*/
 				OFN_DONTADDTORECENT | OFN_PATHMUSTEXIST |
@@ -7383,6 +7449,9 @@ BOOL OpenFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	const BOOL success = GetOpenFileName(&ofn);
 	if (success) {
 		lstrcpyn(lpstrFile, szFile, cchFile);
+		const int iLexer = lexers[ofn.nFilterIndex];
+		flagLexerSpecified = iLexer != 0;
+		iInitialLexer = iLexer;
 	}
 	NP2HeapFree(szFilter);
 	return success;
@@ -7415,7 +7484,8 @@ BOOL SaveFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 
 	WCHAR szNewFile[MAX_PATH];
 	lstrcpy(szNewFile, lpstrFile);
-	LPWSTR szFilter = Style_GetOpenDlgFilterStr(FALSE);
+	int lexers[1 + OPENDLG_MAX_LEXER_COUNT] = {0}; // 1-based filter index
+	LPWSTR szFilter = Style_GetOpenDlgFilterStr(FALSE, szCurFile, lexers);
 
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(OPENFILENAME));
@@ -7424,6 +7494,7 @@ BOOL SaveFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	ofn.lpstrFilter = szFilter;
 	ofn.lpstrFile = szNewFile;
 	ofn.lpstrInitialDir = tchInitialDir;
+	ofn.lpstrDefExt = L""; // auto add first extension from current filter
 	ofn.nMaxFile = MAX_PATH;
 	ofn.Flags = OFN_HIDEREADONLY /*| OFN_NOCHANGEDIR*/ |
 				/*OFN_NODEREFERENCELINKS |*/ OFN_OVERWRITEPROMPT |
@@ -7432,6 +7503,9 @@ BOOL SaveFileDlg(HWND hwnd, LPWSTR lpstrFile, int cchFile, LPCWSTR lpstrInitialD
 	const BOOL success = GetSaveFileName(&ofn);
 	if (success) {
 		lstrcpyn(lpstrFile, szNewFile, cchFile);
+		const int iLexer = lexers[ofn.nFilterIndex];
+		flagLexerSpecified = iLexer != 0;
+		iInitialLexer = iLexer;
 	}
 	NP2HeapFree(szFilter);
 	return success;

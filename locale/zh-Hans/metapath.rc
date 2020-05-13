@@ -183,6 +183,7 @@ BEGIN
     "P",            ACC_SNAPTOTARGET,       VIRTKEY, CONTROL, NOINVERT
     "Q",            IDM_FILE_QUICKVIEW,     VIRTKEY, CONTROL, NOINVERT
     "R",            IDM_FILE_RUN,           VIRTKEY, CONTROL, NOINVERT
+    "R",            IDM_FILE_RESTART,       VIRTKEY, ALT, NOINVERT
     "S",            IDM_FILE_SAVEAS,        VIRTKEY, CONTROL, NOINVERT
     "S",            IDM_VIEW_STATUSBAR,     VIRTKEY, ALT, NOINVERT
     "T",            IDM_VIEW_ALWAYSONTOP,   VIRTKEY, CONTROL, NOINVERT
@@ -422,6 +423,13 @@ BEGIN
     LTEXT           "“收藏夹”文件夹(F11)(&F): ",IDC_STATIC,10,76,120,8
     EDITTEXT        IDC_FAVORITES,10,87,191,14,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_BROWSE_F,204,87,14,14,BS_BITMAP
+    GROUPBOX        "系统集成(需要管理员权限)",IDC_GROUP_SYSTEM_INTEGRATION,7,111,218,72
+    AUTOCHECKBOX    "将 metapath 添加到 Windows 资源管理器的右键菜单",IDC_ENABLE_CONTEXT_MENU,14,124,204,10,WS_TABSTOP
+    LTEXT           "右键菜单文字: ",IDC_STATIC,28,139,70,8
+    EDITTEXT        IDC_CONTEXT_MENU_TEXT,100,136,118,14,ES_AUTOHSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "启用任务栏跳转列表",IDC_ENABLE_JUMP_LIST,14,152,204,10,WS_TABSTOP
+    LTEXT           "应用程序名称: ",IDC_STATIC,28,167,70,8
+    EDITTEXT        IDC_APPLICATION_NAME,100,164,118,14,ES_AUTOHSCROLL | WS_TABSTOP
 END
 
 IDD_FINDTARGET DIALOGEX 0, 0, 272, 210
@@ -434,7 +442,7 @@ BEGIN
     LTEXT           "如果目标应用程序已在运行，指定操作: ",IDC_STATIC,7,64,260,8
     EDITTEXT        IDC_TARGETPATH,20,35,226,14,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_BROWSE,251,35,14,14,BS_BITMAP
-    AUTORADIOBUTTON "无，每次打开文件时都运行目标应用程序。",IDC_ALWAYSRUN,7,78,240,10,WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "无，每次打开文件时都运行目标应用程序",IDC_ALWAYSRUN,7,78,240,10,WS_GROUP | WS_TABSTOP
     AUTORADIOBUTTON "发送文件打开消息到目标应用窗口: ",IDC_SENDDROPMSG,7,92,194,10,WS_TABSTOP
     AUTORADIOBUTTON "执行以下 DDE 命令: ",IDC_USEDDE,7,106,160,10,WS_TABSTOP
     PUSHBUTTON      "查找窗口...",IDC_FINDWIN,204,91,60,14
@@ -618,35 +626,39 @@ BEGIN
 	IDS_NUMFILES			"%s 个对象"
 	IDS_NUMFILES_FILTER		"%s 个对象|过滤"
 	IDS_SAVEFILE			"正在保存“%s”..."
+    IDS_LINKDESCRIPTION     "在 metapath 中打开"
 END
 
 STRINGTABLE
 BEGIN
-    IDS_ERR_CD              "目录访问错误\n无权访问指定目录。\n请检查磁盘或网络连接。"
-    IDS_ERR_FILE            "文件访问错误\n无权访问“%s”。\n该文件可能正被其他应用程序使用。\n请检查磁盘或网络连接。"
-    IDS_ERR_NEW             "文件访问错误\n无法创建文件。\n请检查磁盘或网络连接。"
-    IDS_ERR_NEWDIR          "目录访问错误\n无法创建文件夹。\n请检查磁盘或网络连接。"
-    IDS_ERR_SAVEAS1         "文件保存错误\n保存“%s”时出错。\n可能是现有文件被写保护了。"
-    IDS_ERR_SAVEAS2         "文件保存错误\n删除已保存文件的只读属性时出错。"
-    IDS_ERR_CMDLINE         "metapath\n访问命令行中指定的文件或文件夹时出错。"
-    IDS_ERR_STARTUPDIR      "metapath\n无权访问启动文件夹。"
-    IDS_ERR_DROP1           "metapath\n无权访问拖拽放置的文件或文件夹。"
-    //IDS_ERR_DROP2           "metapath\nOnly a single file or directory can be dropped at a time."
-    IDS_ERR_FAVORITES       "收藏夹\n无权访问“收藏夹”文件夹。\n请在“选项”对话框中指定一个有效的文件夹。"
-    IDS_ERR_LNK_GETPATH     "链接错误\n没有可用于链接的对象的有效的文件系统路径。\n链接可能未指向一个文件或文件夹。"
-    IDS_ERR_LNK_NOACCESS    "链接错误\n无权访问已链接对象的文件系统路径。\n请检查磁盘或网络连接。"
-    IDS_ERR_CREATELINK      "链接错误\n创建指定的链接时出错。\n可能目标文件夹被写保护了。"
-    IDS_ERR_FILTER          "文件过滤错误\n未指定其他过滤项。\n请参阅 metapath 自述文件以获取更多信息。"
-    IDS_ERR_PREVWINDISABLED "metapath\n现有的 metapath 窗口正忙或有一个活动的对话框。\n要另外打开一个 metapath 窗口吗？"
+    IDS_ERR_CD              "无权访问指定目录。\n请检查磁盘或网络连接。"
+    IDS_ERR_FILE            "无权访问“%s”。\n该文件可能正被其他应用程序使用。\n请检查磁盘或网络连接。"
+    IDS_ERR_NEW             "无法创建文件。\n请检查磁盘或网络连接。"
+    IDS_ERR_NEWDIR          "无法创建文件夹。\n请检查磁盘或网络连接。"
+    IDS_ERR_SAVEAS1         "保存“%s”时出错。\n可能是现有文件被写保护了。"
+    IDS_ERR_SAVEAS2         "删除已保存文件的只读属性时出错。"
+    IDS_ERR_CMDLINE         "访问命令行中指定的文件或文件夹时出错。"
+    IDS_ERR_STARTUPDIR      "无权访问启动文件夹。"
+    IDS_ERR_DROP1           "无权访问拖拽放置的文件或文件夹。"
+    //IDS_ERR_DROP2           "Only a single file or directory can be dropped at a time."
+    IDS_ERR_FAVORITES       "无权访问“收藏夹”文件夹。\n请在“选项”对话框中指定一个有效的文件夹。"
+    IDS_ERR_LNK_GETPATH     "没有可用于链接的对象的有效的文件系统路径。\n链接可能未指向一个文件或文件夹。"
+    IDS_ERR_LNK_NOACCESS    "无权访问已链接对象的文件系统路径。\n请检查磁盘或网络连接。"
+    IDS_ERR_CREATELINK      "创建指定的链接时出错。\n可能目标文件夹被写保护了。"
+    IDS_ERR_FILTER          "未指定其他过滤项。\n请参阅 metapath 自述文件以获取更多信息。"
+    IDS_ERR_PREVWINDISABLED "现有的 metapath 窗口正忙或有一个活动的对话框。\n要另外打开一个 metapath 窗口吗？"
+#if NP2_ENABLE_APP_LOCALIZATION_DLL
+	IDS_CHANGE_LANG_RESTART	"更改界面语言需要重新启动 metapath，现在就重新启动吗？"
+#endif
 END
 
 STRINGTABLE
 BEGIN
-    IDS_ERR_TARGETDISABLED  "metapath\n现有的目标窗口正忙或有一个活动的对话框。\n要打开一个新的窗口吗？"
-    IDS_ERR_INVALIDTARGET   "metapath\n请确保已填写所有需要的字段。\n如果对应的选项已启用，您还需要找一个目标窗口。"
-    IDS_ERR_INIOPEN         "metapath\n没有权限访问 metapath 配置文件。"
-    IDS_ERR_INICREATE       "保存设置\n创建配置文件时出错。"
-    IDS_ERR_INIWRITE        "保存设置\n设置没有保存！\n没有写入配置文件的权限。"
+    IDS_ERR_TARGETDISABLED  "现有的目标窗口正忙或有一个活动的对话框。\n要打开一个新的窗口吗？"
+    IDS_ERR_INVALIDTARGET   "请确保已填写所有需要的字段。\n如果对应的选项已启用，您还需要找一个目标窗口。"
+    IDS_ERR_INIOPEN         "没有权限访问 metapath 配置文件。"
+    IDS_ERR_INICREATE       "创建配置文件时出错。"
+    IDS_ERR_INIWRITE        "设置没有保存！\n没有写入配置文件的权限。"
 END
 
 STRINGTABLE
@@ -666,7 +678,7 @@ BEGIN
     IDS_OPENWITH            "点击此处选择存放您收藏的应用程序链接的文件夹。"
     IDS_COPYMOVE            "选择目标文件夹。"
     IDS_CREATELINK          "选择新链接的目标文件夹。"
-    IDS_SAVESETTINGS        "保存设置\n当前的程序设置已保存。"
+    IDS_SAVESETTINGS        "当前的程序设置已保存。"
 END
 
 #if NP2_ENABLE_APP_LOCALIZATION_DLL
